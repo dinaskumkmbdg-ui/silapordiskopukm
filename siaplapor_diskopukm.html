@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="id" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SIAPLAPOR DISKOPUKM</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+    
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: { extend: { colors: { neon: '#06b6d4' } } }
+        }
+    </script>
+
+    <style>
+        body { font-family: 'Outfit', sans-serif; }
+        .glass { background: rgba(30, 41, 59, 0.5); backdrop-filter: blur(15px); border: 1px solid rgba(255, 255, 255, 0.1); }
+        .loader { border-top-color: #06b6d4; animation: spinner 1.5s linear infinite; }
+        @keyframes spinner { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen p-4 md:p-8">
+
+    <div id="loader" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-950/90 backdrop-blur-sm">
+        <div class="loader ease-linear rounded-full border-4 border-t-4 border-cyan-500 h-12 w-12"></div>
+    </div>
+
+    <!-- Notification Toast -->
+    <div id="toast" class="hidden fixed bottom-5 right-5 z-50 bg-cyan-600 text-white px-6 py-3 rounded-2xl shadow-xl"></div>
+
+    <main class="max-w-2xl mx-auto space-y-8">
+        <header class="flex justify-between items-center">
+            <h1 class="text-2xl font-bold flex items-center gap-3">
+                <i data-lucide="shield-check" class="text-cyan-500 w-8 h-8"></i> SIAPLAPOR DISKOPUKM
+            </h1>
+        </header>
+
+        <form id="reportForm" class="glass rounded-3xl p-6 md:p-8 shadow-2xl space-y-6">
+            <div id="employeesList" class="space-y-3">
+                <label class="block text-sm font-semibold">Nama Pegawai</label>
+                <div class="flex gap-2">
+                    <input type="text" name="employee" placeholder="Nama Pegawai" class="w-full bg-slate-800 border-none rounded-xl p-3 outline-none focus:ring-2 focus:ring-cyan-500 transition">
+                    <button type="button" onclick="addEmployee()" class="bg-slate-700 px-4 rounded-xl">+</button>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-4">
+                <input type="date" id="date" class="w-full bg-slate-800 border-none rounded-xl p-3 outline-none">
+                <input type="time" id="time" class="w-full bg-slate-800 border-none rounded-xl p-3 outline-none">
+            </div>
+
+            <input type="text" id="activity" placeholder="Nama Kegiatan" class="w-full bg-slate-800 border-none rounded-xl p-3 outline-none">
+            <input type="text" id="location" placeholder="Tempat Kegiatan" class="w-full bg-slate-800 border-none rounded-xl p-3 outline-none">
+            <textarea id="description" rows="3" placeholder="Uraian Kegiatan" class="w-full bg-slate-800 border-none rounded-xl p-3 outline-none"></textarea>
+
+            <div class="space-y-2">
+                <label class="block text-sm font-semibold">Dokumentasi Foto</label>
+                <input type="file" id="photoInput" multiple accept="image/*" onchange="handlePhotoUpload(event)" class="w-full text-sm text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:bg-cyan-600 file:text-white cursor-pointer">
+                <div id="photoPreview" class="grid grid-cols-3 gap-2 mt-2"></div>
+            </div>
+
+            <button type="button" onclick="submitReport()" class="w-full bg-cyan-600 text-white py-4 rounded-2xl hover:bg-cyan-700 transition font-bold shadow-lg shadow-cyan-500/20">
+                Kirim Laporan
+            </button>
+        </form>
+
+        <section class="space-y-4">
+            <h2 class="text-lg font-semibold flex items-center gap-2"><i data-lucide="history" class="w-5 h-5"></i> Riwayat</h2>
+            <div id="historyList" class="space-y-3"></div>
+        </section>
+    </main>
+
+    <script>
+        lucide.createIcons();
+        let uploadedPhotos = [];
+
+        window.onload = loadHistory;
+
+        function showToast(msg) {
+            const toast = document.getElementById('toast');
+            toast.innerText = msg;
+            toast.classList.remove('hidden');
+            setTimeout(() => toast.classList.add('hidden'), 3000);
+        }
+
+        function addEmployee() {
+            const container = document.getElementById('employeesList');
+            const div = document.createElement('div');
+            div.className = "flex gap-2 employee-row";
+            div.innerHTML = `<input type="text" name="employee" placeholder="Nama Pegawai" class="w-full bg-slate-800 border-none rounded-xl p-3 outline-none"><button type="button" onclick="this.parentElement.remove()" class="bg-red-500/20 text-red-500 px-4 rounded-xl">×</button>`;
+            container.appendChild(div);
+        }
+
+        function handlePhotoUpload(event) {
+            const preview = document.getElementById('photoPreview');
+            preview.innerHTML = '';
+            uploadedPhotos = [];
+            Array.from(event.target.files).forEach(file => {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    uploadedPhotos.push(e.target.result);
+                    const img = document.createElement('img');
+                    img.src = e.target.result;
+                    img.className = "h-20 w-full object-cover rounded-xl border border-slate-700";
+                    preview.appendChild(img);
+                };
+                reader.readAsDataURL(file);
+            });
+        }
+
+        function submitReport() {
+            try {
+                const employees = Array.from(document.querySelectorAll('input[name="employee"]')).map(i => i.value).filter(v => v !== "");
+                const report = {
+                    id: Date.now(),
+                    activity: document.getElementById('activity').value,
+                    date: document.getElementById('date').value,
+                    time: document.getElementById('time').value,
+                    description: document.getElementById('description').value,
+                    location: document.getElementById('location').value,
+                    employees: employees,
+                    photos: uploadedPhotos
+                };
+                
+                if (!report.activity) throw new Error("Nama kegiatan harus diisi!");
+
+                const history = JSON.parse(localStorage.getItem('reports') || '[]');
+                history.unshift(report);
+                localStorage.setItem('reports', JSON.stringify(history));
+                
+                // Reset Form
+                document.getElementById('reportForm').reset();
+                document.querySelectorAll('.employee-row').forEach(el => el.remove());
+                document.getElementById('photoPreview').innerHTML = '';
+                uploadedPhotos = [];
+                
+                loadHistory();
+                showToast("Laporan Berhasil Disimpan!");
+            } catch (e) {
+                showToast("Gagal menyimpan: " + e.message);
+                console.error(e);
+            }
+        }
+
+        function loadHistory() {
+            const container = document.getElementById('historyList');
+            const history = JSON.parse(localStorage.getItem('reports') || '[]');
+            container.innerHTML = history.map(r => `
+                <div class="glass p-4 rounded-2xl flex justify-between items-center">
+                    <div>
+                        <p class="font-semibold">${r.activity}</p>
+                        <p class="text-xs opacity-60">${r.date} | ${r.location}</p>
+                    </div>
+                    <div class="flex gap-2">
+                        <button onclick="exportHistoryItem('${r.id}')" class="p-2 text-cyan-400 hover:bg-slate-700 rounded-lg"><i data-lucide="file-text" class="w-5 h-5"></i></button>
+                        <button onclick="deleteReport(${r.id})" class="p-2 text-red-400 hover:bg-slate-700 rounded-lg"><i data-lucide="trash-2" class="w-5 h-5"></i></button>
+                    </div>
+                </div>
+            `).join('');
+            lucide.createIcons();
+        }
+
+        function deleteReport(id) {
+            if (!confirm("Hapus laporan ini?")) return;
+            let history = JSON.parse(localStorage.getItem('reports') || '[]');
+            history = history.filter(r => r.id !== id);
+            localStorage.setItem('reports', JSON.stringify(history));
+            loadHistory();
+            showToast("Laporan Dihapus!");
+        }
+
+        async function exportHistoryItem(id) {
+            document.getElementById('loader').classList.remove('hidden');
+            const { jsPDF } = window.jspdf;
+            const r = JSON.parse(localStorage.getItem('reports')).find(x => x.id == id);
+            const doc = new jsPDF('p', 'mm', 'a4');
+            
+            doc.setFontSize(16);
+            doc.text("SIAPLAPOR DISKOPUKM", 105, 15, { align: "center" });
+            doc.line(12.7, 20, 197.3, 20);
+            
+            doc.setFontSize(11);
+            doc.text("Bismillahirahmanirrahiim", 12.7, 30);
+            doc.text("Izin menyampaikan laporan:", 12.7, 37);
+            
+            doc.text(`Nama Kegiatan: ${r.activity}`, 12.7, 50);
+            doc.text(`Tanggal: ${r.date}`, 12.7, 58);
+            doc.text(`Waktu: ${r.time}`, 12.7, 66);
+            doc.text(`Pegawai: ${r.employees.join(", ")}`, 12.7, 74);
+            doc.text("Uraian Kegiatan:", 12.7, 88);
+            doc.text(doc.splitTextToSize(r.description, 184), 12.7, 95);
+            
+            doc.text("Demikian laporan ini dibuat.", 12.7, 270);
+            doc.text("Terima Kasih.", 12.7, 277);
+
+            if(r.photos && r.photos.length > 0) {
+                doc.addPage();
+                doc.text("Dokumentasi Kegiatan:", 12.7, 15);
+                let x = 12.7, yImg = 25;
+                r.photos.forEach((photo, i) => {
+                    doc.addImage(photo, 'JPEG', x, yImg, 80, 60);
+                    x += 90;
+                    if(x > 150) { x = 12.7; yImg += 70; }
+                });
+            }
+            doc.save(`Laporan_${r.activity}.pdf`);
+            document.getElementById('loader').classList.add('hidden');
+        }
+    </script>
+</body>
+</html>
